@@ -1,0 +1,10 @@
+# ARGO — Angular Resolution Graph Operator
+# Tested on Python 3.10–3.13
+
+torch>=2.0
+torch-geometric>=2.4
+nibabel>=5.0
+dipy>=1.7
+scipy>=1.10
+scikit-learn>=1.3
+numpy>=1.24
