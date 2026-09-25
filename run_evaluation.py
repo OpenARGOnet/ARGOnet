@@ -1,19 +1,24 @@
+# SPDX-License-Identifier: CC-BY-NC-4.0
+# Copyright (c) 2026 OpenARGOnet
 """
 ARGO — run_evaluation.py
 =========================
 Evaluate ARGO predictions against 64-direction CSD reference.
 
 Computes per-voxel Angular Error (AE), Peak Overlap (PO), and fraction
-of voxels below 10° across three white matter FA strata.
+of voxels below 10° across four white matter FA strata
+(Low, High and Core WM, plus the primary stratum FA ≥ 0.5).
 
 Usage:
     python run_evaluation.py \
         --pred  output/sub-10347_fod_predicted.npz \
         --nii64 sample_data/sub-10347_dwi64.nii.gz \
-        --bval  sample_data/sub-10347.bval \
-        --bvec  sample_data/sub-10347.bvec
+        --bval  sample_data/sub-10347_64.bval \
+        --bvec  sample_data/sub-10347_64.bvec
 
 The .bval/.bvec files should correspond to the full 64-direction scheme.
+The 64-direction DWI is not included in sample_data/ and must be downloaded
+from OpenNeuro ds000030 (sub-10347/dwi/sub-10347_dwi.nii.gz); see README.
 The predicted .npz is the output of run_inference.py.
 """
 
@@ -38,7 +43,10 @@ from scipy.ndimage import zoom, binary_erosion
 # Sphere and SH-to-SF matrix (shared across metric functions)
 # ──────────────────────────────────────────────────────────────────
 _sphere = get_sphere('repulsion724')
-_B, _   = sh_to_sf_matrix(_sphere, sh_order=8, basis_type='tournier07')
+# descoteaux07: same SH basis as the coefficients produced by DIPY's
+# ConstrainedSphericalDeconvModel (DIPY default), used for both the
+# 64-direction reference and the ARGO predictions.
+_B, _   = sh_to_sf_matrix(_sphere, sh_order=8, basis_type='descoteaux07')
 
 FA_BANDS = [
     ('Low WM  (FA 0.3–0.5)', 0.3, 0.5),

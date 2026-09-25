@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: CC-BY-NC-4.0
+# Copyright (c) 2026 OpenARGOnet
 """
 ARGO — Angular Resolution Graph Operator
 =========================================

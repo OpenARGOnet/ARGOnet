@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use ARGOnet (code or pre-trained weights), please cite it as below."
+title: "ARGOnet: Angular Resolution Graph Operator"
+type: software
+authors:
+  - family-names: "[COGNOME]"
+    given-names: "[NOME]"
+    affiliation: "Sapienza University of Rome"
+version: "[X.Y]"
+doi: "[ZENODO_DOI]"
+date-released: "[YYYY-MM-DD]"
+license: CC-BY-NC-4.0
+repository-code: "https://github.com/OpenARGOnet/ARGOnet"
+keywords:
+  - diffusion MRI
+  - fiber orientation distribution
+  - angular super-resolution
+  - graph neural network
