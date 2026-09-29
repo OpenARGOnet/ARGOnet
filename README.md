@@ -136,7 +136,7 @@ acquisition parameters (directions, b-value, scanner).
 
 If you use ARGOnet (code or pre-trained weights) in your research, please cite:
 
-> [AUTHORS] (2026). *ARGOnet: Angular Resolution Graph Operator* (Version [X.Y]) [Software and model weights]. Zenodo. https://doi.org/[ZENODO_DOI]
+Doda, B., Marinozzi, F. and Bini, F. (2026) “ARGOnet”. Zenodo. Available at: https://doi.org/10.5281/zenodo.22956118.
 
 The associated manuscript is currently under review at *NeuroImage*.
 This section will be updated with the article reference upon publication.
