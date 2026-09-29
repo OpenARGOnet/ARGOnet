@@ -241,9 +241,13 @@ def _run_inference(model, graph):
 
 
 def _save_outputs(pred_norm, scaler_y, wm_mask, coords_wm,
-                  mask_shape, affine, header, out_dir, subject_id):
+                  mask_shape, affine, header, out_dir, subject_id,
+                  fa_wm, sh_baseline):
     """
-    Inverse-transform predictions and save as .npz and .nii.gz
+    Inverse-transform predictions and save as .npz and .nii.gz.
+    The .npz also stores, per WM node, the 12-direction DTI FA (used by
+    run_evaluation.py for FA stratification, as in the paper) and the
+    12-direction CSD coefficients (baseline).
     """
     os.makedirs(out_dir, exist_ok=True)
 
@@ -253,6 +257,8 @@ def _save_outputs(pred_norm, scaler_y, wm_mask, coords_wm,
     npz_path = os.path.join(out_dir, f"{subject_id}_fod_predicted.npz")
     np.savez_compressed(npz_path,
                         sh_coefficients = sh_pred,
+                        sh_baseline     = sh_baseline.astype(np.float32),
+                        fa12            = fa_wm.astype(np.float32),
                         coords          = coords_wm,
                         mask_shape      = np.array(mask_shape),
                         wm_mask         = wm_mask)
@@ -347,7 +353,8 @@ def main():
 
     npz_path, nii_path = _save_outputs(
         pred_norm, scaler_y, wm_mask, coords_wm,
-        mask_shape, affine, header, args.out, subject_id)
+        mask_shape, affine, header, args.out, subject_id,
+        fa_wm=features[wm_mask, 45], sh_baseline=sh_low_v[wm_mask])
 
     total_time = time.time() - t_total
     print()

@@ -6,15 +6,22 @@ ARGO — run_evaluation.py
 Evaluate ARGO predictions against 64-direction CSD reference.
 
 Computes per-voxel Angular Error (AE), Peak Overlap (PO), and fraction
-of voxels below 10° across four white matter FA strata
-(Low, High and Core WM, plus the primary stratum FA ≥ 0.5).
+of voxels below 10° across the white matter FA strata of the paper
+(Low, High and Core WM, All WM FA ≥ 0.5 as primary stratum, All WM FA ≥ 0.3),
+for both ARGO and the 12-direction CSD baseline.
+
+Protocol identical to the paper evaluation:
+  - voxels: ARGO graph nodes (FA ≥ 0.3 from 12-direction DTI)
+  - FA strata: 12-direction DTI FA (stored in the .npz by run_inference.py)
+  - reference: CSD on the full 64-direction data, same 1.5x upsampling and mask
+  - PO: computed on all voxels of each stratum
 
 Usage:
-    python run_evaluation.py \
-        --pred  output/sub-10347_fod_predicted.npz \
-        --nii64 sample_data/sub-10347_dwi64.nii.gz \
-        --bval  sample_data/sub-10347_64.bval \
-        --bvec  sample_data/sub-10347_64.bvec
+    python run_evaluation.py
+
+    Default paths point to sub-10347 (local UCLA CNP 64-direction data and the
+    prediction produced by run_inference.py on sample_data/sub-10347_dwi12).
+    Any of them can still be overridden with --pred / --nii64 / --bval / --bvec.
 
 The .bval/.bvec files should correspond to the full 64-direction scheme.
 The 64-direction DWI is not included in sample_data/ and must be downloaded
@@ -51,10 +58,22 @@ _B, _   = sh_to_sf_matrix(_sphere, sh_order=8, basis_type='descoteaux07')
 FA_BANDS = [
     ('Low WM  (FA 0.3–0.5)', 0.3, 0.5),
     ('High WM (FA 0.5–0.7)', 0.5, 0.7),
-    ('Core WM (FA ≥ 0.7)',   0.7, 9.9),
-    ('All WM  (FA ≥ 0.5)',   0.5, 9.9),
+    ('Core WM (FA ≥ 0.7)',   0.7, np.inf),
+    ('All WM  (FA ≥ 0.5)',   0.5, np.inf),
+    ('All WM  (FA ≥ 0.3)',   0.3, np.inf),
 ]
+CHUNK = 20000
 PRIMARY_STRATUM = 'All WM  (FA ≥ 0.5)'
+
+# ──────────────────────────────────────────────────────────────────
+# Default paths (sub-10347)
+# ──────────────────────────────────────────────────────────────────
+SUBJECT_DIR = ("/Users/begido/Desktop/UCLA Consortium for Neuropsychiatric "
+               "Phenomics (CNP) - Diffusion Data/dataset_ucla_dwi/sub-10347")
+DEFAULT_PRED  = "output/sub-10347_dwi12_fod_predicted.npz"
+DEFAULT_NII64 = os.path.join(SUBJECT_DIR, "sub-10347_dwi.nii.gz")
+DEFAULT_BVAL  = os.path.join(SUBJECT_DIR, "sub-10347_dwi.bval")
+DEFAULT_BVEC  = os.path.join(SUBJECT_DIR, "sub-10347_dwi.bvec")
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -65,7 +84,10 @@ def _sf(sh):
     return np.clip(sh @ _B, 0, None)
 
 def _primary_peaks(sh):
-    return _sphere.vertices[np.argmax(_sf(sh), axis=1)]
+    out = np.empty((len(sh), 3))
+    for s in range(0, len(sh), CHUNK):
+        out[s:s + CHUNK] = _sphere.vertices[np.argmax(_sf(sh[s:s + CHUNK]), axis=1)]
+    return out
 
 def _angular_error(sh_pred, sh_ref):
     p1 = _primary_peaks(sh_pred)
@@ -74,18 +96,15 @@ def _angular_error(sh_pred, sh_ref):
         np.arccos(np.clip(np.abs(np.sum(p1 * p2, axis=1)), 0, 1))
     )
 
-def _peak_overlap(sh_pred, sh_ref, max_vox=2000, angle_thr=25.0):
+def _peak_overlap(sh_pred, sh_ref, angle_thr=25.0):
     """
     Peak Overlap: fraction of reference FOD peaks recovered within
-    angle_thr degrees. Up to 3 peaks per voxel. Evaluated on a
-    random subsample of max_vox voxels (seed=0).
+    angle_thr degrees. Up to 3 greedy peaks per voxel, no amplitude
+    threshold. Evaluated on ALL voxels (paper implementation).
     """
     thresh = np.cos(np.radians(angle_thr))
-    np.random.seed(0)
-    idx  = np.random.choice(len(sh_pred),
-                            min(max_vox, len(sh_pred)), replace=False)
-    sp2  = sh_pred[idx]
-    st2  = sh_ref[idx]
+    sp2  = sh_pred
+    st2  = sh_ref
 
     def _get_peaks(row):
         peaks = []
@@ -100,7 +119,7 @@ def _peak_overlap(sh_pred, sh_ref, max_vox=2000, angle_thr=25.0):
 
     def _recall(est_peaks, ref_peaks):
         if not ref_peaks:
-            return 1.0
+            return np.nan
         return sum(
             any(
                 np.degrees(np.arccos(
@@ -111,7 +130,7 @@ def _peak_overlap(sh_pred, sh_ref, max_vox=2000, angle_thr=25.0):
             for r in ref_peaks
         ) / len(ref_peaks)
 
-    return np.mean([
+    return np.nanmean([
         _recall(_get_peaks(sp2[i]), _get_peaks(st2[i]))
         for i in range(len(sp2))
     ])
@@ -168,13 +187,13 @@ def main():
     parser = argparse.ArgumentParser(
         description="Evaluate ARGO predictions against 64-direction CSD reference"
     )
-    parser.add_argument("--pred",  required=True,
+    parser.add_argument("--pred",  default=DEFAULT_PRED,
                         help="Path to .npz output from run_inference.py")
-    parser.add_argument("--nii64", required=True,
+    parser.add_argument("--nii64", default=DEFAULT_NII64,
                         help="Path to 64-direction DWI NIfTI (.nii or .nii.gz)")
-    parser.add_argument("--bval",  required=True,
+    parser.add_argument("--bval",  default=DEFAULT_BVAL,
                         help="Path to .bval file (64-direction scheme)")
-    parser.add_argument("--bvec",  required=True,
+    parser.add_argument("--bvec",  default=DEFAULT_BVEC,
                         help="Path to .bvec file (64-direction scheme)")
     parser.add_argument("--out",   default=None,
                         help="Optional: save results as .txt (default: print only)")
@@ -195,6 +214,12 @@ def main():
     coords_pred = npz['coords']
     mask_shape = tuple(npz['mask_shape'])
     wm_mask    = npz['wm_mask']
+    if 'fa12' not in npz.files or 'sh_baseline' not in npz.files:
+        raise SystemExit(
+            "\n  The .npz was produced by an older run_inference.py (no 12-direction FA /"
+            "\n  baseline stored). Re-run run_inference.py and evaluate again.\n")
+    fa12_pred  = npz['fa12'].astype(np.float32)
+    sh_base    = npz['sh_baseline'].astype(np.float32)
     print(f"  Predicted WM voxels: {len(sh_pred):,}")
 
     # Compute reference
@@ -220,23 +245,19 @@ def main():
     shared_ref_idx  = np.array(shared_ref_idx)
 
     sh_pred_shared = sh_pred[shared_pred_idx]
+    sh_base_shared = sh_base[shared_pred_idx]
     sh_ref_shared  = sh_ref_all[shared_ref_idx]
-    fa_shared      = fa_ref_all[shared_ref_idx]
+    # FA strata from 12-direction DTI, as in the paper
+    fa_shared      = fa12_pred[shared_pred_idx]
 
     print(f"  Shared WM voxels: {len(sh_pred_shared):,}")
 
-    # Also compute baseline (12-dir CSD = low-order SH from prediction input)
-    # Note: baseline is the first 45 dims of the input features (already SH)
-    # We load these from the wm_mask info — not available here directly.
-    # We report AE for ARGO predictions only; baseline requires run_inference
-    # intermediate data. For a full comparison, run both on the same subject.
-
-    # Evaluate per FA stratum
+    # Evaluate per FA stratum, ARGO and 12-direction CSD baseline
     print()
-    print("=" * 65)
-    print(f"  {'FA Stratum':<24} {'N vox':>8} {'AE (°)':>9} "
+    print("=" * 78)
+    print(f"  {'FA Stratum':<24} {'N vox':>8} {'Method':>9} {'AE (°)':>9} "
           f"{'PO':>8} {'<10°':>7}")
-    print("  " + "-" * 63)
+    print("  " + "-" * 76)
 
     results = {}
     for label, fa_lo, fa_hi in FA_BANDS:
@@ -245,35 +266,37 @@ def main():
         if n == 0:
             print(f"  {label:<24} {'0':>8}  — no voxels")
             continue
-
-        sp = sh_pred_shared[m]
         st = sh_ref_shared[m]
+        for method, sh in (("CSD-12", sh_base_shared), ("ARGO", sh_pred_shared)):
+            sp = sh[m]
+            ae_vals = _angular_error(sp, st)
+            po      = _peak_overlap(sp, st)
+            p10     = float((ae_vals < 10).mean() * 100)
+            ae_mean = float(ae_vals.mean())
+            ae_std  = float(ae_vals.std())
+            primary = " ◀" if (label == PRIMARY_STRATUM and method == "ARGO") else ""
+            lab = label if method == "CSD-12" else ""
+            nn_ = f"{n:,}" if method == "CSD-12" else ""
+            print(f"  {lab:<24} {nn_:>8} {method:>9} {ae_mean:>7.2f}°"
+                  f" {po:>9.3f} {p10:>6.1f}%{primary}")
+            results[(label, method)] = dict(n=n, ae_mean=ae_mean, ae_std=ae_std,
+                                            po=po, p10=p10)
 
-        ae_vals = _angular_error(sp, st)
-        po      = _peak_overlap(sp, st)
-        p10     = float((ae_vals < 10).mean() * 100)
-        ae_mean = float(ae_vals.mean())
-        ae_std  = float(ae_vals.std())
-
-        primary = " ◀" if label == PRIMARY_STRATUM else ""
-        print(f"  {label:<24} {n:>8,} {ae_mean:>7.2f}°"
-              f" {po:>9.3f} {p10:>6.1f}%{primary}")
-
-        results[label] = dict(n=n, ae_mean=ae_mean, ae_std=ae_std,
-                               po=po, p10=p10)
-
-    print("=" * 65)
+    print("=" * 78)
     print()
 
     # Primary stratum summary
-    if PRIMARY_STRATUM in results:
-        r = results[PRIMARY_STRATUM]
+    if (PRIMARY_STRATUM, "ARGO") in results:
+        r = results[(PRIMARY_STRATUM, "ARGO")]
+        b = results[(PRIMARY_STRATUM, "CSD-12")]
         print(f"  Primary stratum (FA ≥ 0.5):")
-        print(f"    AE  = {r['ae_mean']:.2f}°")
-        print(f"    PO  = {r['po']:.3f}")
-        print(f"    <10° = {r['p10']:.1f}% of WM voxels")
+        print(f"    AE   ARGO {r['ae_mean']:.2f}°  |  CSD-12 {b['ae_mean']:.2f}°  "
+              f"|  ΔAE {b['ae_mean'] - r['ae_mean']:+.2f}°")
+        print(f"    PO   ARGO {r['po']:.3f}  |  CSD-12 {b['po']:.3f}")
+        print(f"    <10° ARGO {r['p10']:.1f}%  |  CSD-12 {b['p10']:.1f}% of WM voxels")
         print()
-        print(f"  Expected for sub-10347: AE ≈ 14.96°, PO ≈ 0.807")
+        print(f"  Paper, Table 1 (mean over test subjects, not a single subject):")
+        print(f"    CSD-12 21.61°  |  ARGO 14.96°")
         print()
 
     # Optional save
@@ -284,8 +307,8 @@ def main():
             f.write("=" * 65 + "\n")
             f.write(f"Predictions: {args.pred}\n")
             f.write(f"Reference:   {args.nii64}\n\n")
-            for label, r in results.items():
-                f.write(f"{label}\n")
+            for (label, method), r in results.items():
+                f.write(f"{label}  [{method}]\n")
                 f.write(f"  N={r['n']:,}  AE={r['ae_mean']:.2f}±{r['ae_std']:.2f}°  "
                         f"PO={r['po']:.3f}  <10°={r['p10']:.1f}%\n")
         print(f"  Results saved to: {args.out}")
