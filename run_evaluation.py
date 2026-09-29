@@ -19,9 +19,10 @@ Protocol identical to the paper evaluation:
 Usage:
     python run_evaluation.py
 
-    Default paths point to sub-10347 (local UCLA CNP 64-direction data and the
-    prediction produced by run_inference.py on sample_data/sub-10347_dwi12).
-    Any of them can still be overridden with --pred / --nii64 / --bval / --bvec.
+    Default paths point to the sample subject sub-10347: the prediction written
+    by run_inference.py on sample_data/sub-10347_dwi12.nii.gz and the
+    64-direction DWI downloaded to sample_data/sub-10347_dwi64.nii.gz (see README).
+    Any of them can be overridden with --pred / --nii64 / --bval / --bvec.
 
 The .bval/.bvec files should correspond to the full 64-direction scheme.
 The 64-direction DWI is not included in sample_data/ and must be downloaded
@@ -66,14 +67,12 @@ CHUNK = 20000
 PRIMARY_STRATUM = 'All WM  (FA ≥ 0.5)'
 
 # ──────────────────────────────────────────────────────────────────
-# Default paths (sub-10347)
+# Default paths (sample subject sub-10347, see README)
 # ──────────────────────────────────────────────────────────────────
-SUBJECT_DIR = ("/Users/begido/Desktop/UCLA Consortium for Neuropsychiatric "
-               "Phenomics (CNP) - Diffusion Data/dataset_ucla_dwi/sub-10347")
 DEFAULT_PRED  = "output/sub-10347_dwi12_fod_predicted.npz"
-DEFAULT_NII64 = os.path.join(SUBJECT_DIR, "sub-10347_dwi.nii.gz")
-DEFAULT_BVAL  = os.path.join(SUBJECT_DIR, "sub-10347_dwi.bval")
-DEFAULT_BVEC  = os.path.join(SUBJECT_DIR, "sub-10347_dwi.bvec")
+DEFAULT_NII64 = "sample_data/sub-10347_dwi64.nii.gz"
+DEFAULT_BVAL  = "sample_data/sub-10347_64.bval"
+DEFAULT_BVEC  = "sample_data/sub-10347_64.bvec"
 
 
 # ──────────────────────────────────────────────────────────────────

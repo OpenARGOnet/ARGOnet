@@ -57,7 +57,7 @@ python run_inference.py \
 
 ### Output
 
-- `{subject_id}_fod_predicted.npz` — predicted SH coefficients (order 8, 45 coefficients per WM voxel) + voxel coordinates
+- `{subject_id}_fod_predicted.npz` — predicted SH coefficients (order 8, 45 coefficients per WM voxel), voxel coordinates, and, per WM voxel, the 12-direction DTI FA and the 12-direction CSD coefficients (baseline), used by `run_evaluation.py`
 - `{subject_id}_fod_predicted.nii.gz` — full-volume NIfTI (45 SH coefficients per voxel)
 
 All SH coefficients use DIPY's `descoteaux07` basis (the default of
@@ -98,15 +98,20 @@ aws s3 cp --no-sign-request \
 Then run:
 
 ```bash
-python run_evaluation.py \
-    --pred  output/sub-10347_fod_predicted.npz \
-    --nii64 sample_data/sub-10347_dwi64.nii.gz \
-    --bval  sample_data/sub-10347_64.bval \
-    --bvec  sample_data/sub-10347_64.bvec
+python run_evaluation.py
 ```
 
+With no arguments the script uses `output/sub-10347_dwi12_fod_predicted.npz`
+(the output of the inference command above), `sample_data/sub-10347_dwi64.nii.gz`,
+`sample_data/sub-10347_64.bval` and `sample_data/sub-10347_64.bvec`; each path can
+be overridden with `--pred`, `--nii64`, `--bval` and `--bvec`.
+
 The script reports angular error (AE), peak overlap (PO) and the fraction of
-voxels below 10° for each white matter FA stratum.
+voxels below 10°, for ARGOnet and for the 12-direction CSD baseline, in each
+white matter FA stratum. The protocol matches the manuscript: evaluation on the
+ARGOnet graph voxels (FA ≥ 0.3), FA strata defined on the 12-direction DTI,
+PO computed on all voxels. The values in Table 1 of the manuscript are means
+over the test subjects; a single subject can differ from them.
 
 ---
 
